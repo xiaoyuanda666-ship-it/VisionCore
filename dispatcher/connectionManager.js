@@ -1,5 +1,3 @@
-const WebSocket = require('ws');
-
 class ConnectionManager {
   constructor() {
     this.connections = new Map(); // key: id, value: { ws, type }
@@ -22,4 +20,4 @@ class ConnectionManager {
   }
 }
 
-module.exports = ConnectionManager;
+export default ConnectionManager;
