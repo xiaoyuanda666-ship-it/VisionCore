@@ -6,6 +6,10 @@ import { spawn } from 'child_process';
 
 const AGENT_ROOT = path.resolve('./agents_data');
 const META_FILE = path.join(AGENT_ROOT, 'agents_meta.json');
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 fs.ensureDirSync(AGENT_ROOT);
 
@@ -99,7 +103,7 @@ class AgentManager {
     if (!agentInfo) throw new Error(`Agent ${agentId} does not exist`);
     if (agentInfo.status === 'running') throw new Error(`Agent ${agentId} is already running`);
 
-    const scriptPath = path.resolve('./agents/MainAgent.js');
+    const scriptPath = path.join(__dirname, '../core/runtime/MainAgent.js');
     const child = spawn('node', [scriptPath, agentId, agentInfo.path], {
       stdio: ['pipe', 'pipe', 'pipe'],// 子进程的输入输出全都通过管道传给父进程
       // stdio: 'ignore',  // 不关心输出

@@ -5,5 +5,16 @@
     "status": "stopped",
     "startedAt": null,
     "lastActive": null
+  },
+  "agent-001": {
+    "path": "C:\\Users\\xiaoy\\VisionHub\\agents_data\\agent-001",
+    "lastPID": null,
+    "status": "stopped",
+    "startedAt": "2026-03-09T14:32:53.824Z",
+    "lastActive": "2026-03-09T14:32:56.162Z",
+    "llm": {
+      "model": "gpt-4o",
+      "temperature": 0.7
+    }
   }
 }
