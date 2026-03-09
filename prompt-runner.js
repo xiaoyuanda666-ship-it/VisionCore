@@ -20,10 +20,11 @@ async function run() {
   for (const file of promptFiles) {
     const prompt = fs.readFileSync(path.join(PROMPT_DIR, file), "utf8")
 
-    const userPrompt = `帮我写一篇关于爱情的文章，要求不少于1000字`
+    const userPrompt = `[系统Tick] 2023-10-18 15:00:00`
 
     const messages = [{ role: "system", content: prompt }]
     messages.push({ role: "user", content: userPrompt })
+    messages.push({ role: "user", content: "[系统Tick] 2023-10-18 15:00:20" })
     
     try {
       const res = await adapter.send(messages)

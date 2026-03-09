@@ -4,9 +4,10 @@ import { BaseLLMClient } from "./BaseLLMClient.js";
 export class OpenAIClient extends BaseLLMClient {
 
   constructor(config = {}) {
-
+    super()
     this.client = new OpenAI({
-      apiKey: config.apiKey
+      apiKey: config.apiKey,
+      baseURL: "https://api.openai.com/v1"
     });
 
     this.model = config.model || "gpt-4o-mini";
@@ -26,5 +27,10 @@ export class OpenAIClient extends BaseLLMClient {
       role: "assistant",
       content: response.choices[0].message.content
     };
+  }
+
+  async pingHello() {
+    const res = await this.send([{ role: "user", content: "Hello" }], { max_tokens: 4000 });
+    return res.text.length > 0;
   }
 }

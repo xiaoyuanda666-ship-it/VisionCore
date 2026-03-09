@@ -4,7 +4,7 @@
   "description": "一个连接人类与 AI Agent 的统一平台，通过消息分发器实现交互。用户可以通过自然语言创建、配置和管理自主智能体（Autonomous Agent）。命令 Agent（Command Agent）在后台负责系统级管理，对用户完全透明；自主 Agent 拥有记忆、周期性思考（Tick），能与用户及其他 Agent 自主交流。零配置启动，支持扩展，是一个 AI 驱动的智能体生态系统。",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watchAll",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "prompt": "node test-prompts/prompt.js"
   },
   "repository": {
@@ -27,6 +27,8 @@
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "fs-extra": "^11.3.4",
+    "lodash.merge": "^4.6.2",
     "openai": "^6.27.0",
     "sqlite3": "^5.1.7",
     "ws": "^8.19.0"

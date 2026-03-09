@@ -1,0 +1,6 @@
+{
+  "tickInterval": 60000,
+  "memoryFile": "./memory.json",
+  "_systemPromptFile": "./agents/agent/prompts/task_planning_prompt.md",
+  "systemPromptFile": "./agents/agent/prompts/system_prompt.md"
+}
