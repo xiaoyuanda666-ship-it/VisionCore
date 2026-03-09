@@ -1,277 +1,134 @@
+// core/agent/agent.js
 import { HistoryManager } from "../../utils/HistoryManager.js";
 import { getSystemPrompt } from "../../utils/systemPrompt.js";
 import { MetaAbilityManager } from "./MetaAbilityManager.js";
-import { LLMManager } from "../ai/LLMManager.js"
+import { LLMManager } from "../ai/LLMManager.js";
 import { runTool } from "../agent/tools/toolRouter.js";
-const llm = new LLMManager()
-await llm.init()
-
-// 测试调用 LLM
-const res = await llm.call(
-  "deepseek-chat",
-  [{ role: "user", content: "say hello" }]
-)
-
-console.log(res.text) // "Hello, how can I assist you today?"
 
 export class Agent {
   constructor() {
-    this.historyManager = new HistoryManager({
-      historyDir: "./conversation"
-    });
-    this.tickInterval = 20000; // 20s tick interval
-    this.systemPrompt = getSystemPrompt() || "Default system prompt"; // 默认系统提示词，后续可从配置文件读取
+    this.historyManager = new HistoryManager({ historyDir: "./conversation" });
+    this.systemPrompt = getSystemPrompt() || "Default system prompt";
+    this.metaAbilityManager = new MetaAbilityManager();
 
-    this.userQueue = []; // 用户消息队列
-    this.processing = false; // 防止并发处理用户消息
-    this.metaAbilityManager = new MetaAbilityManager(); // 元能力管理器
+    this.queue = []; // 统一事件队列
+    this.processing = false;
+    this.processingPromise = null;
+
+    this.llm = new LLMManager(); // LLM 管理器
   }
 
-  enqueueUser(text) {
-    this.userQueue.push({ role: "user", content: text });
-    this.triggerProcess();
+  async init() {
+    await this.llm.init();
   }
 
-  enqueueTick(text) {
-    this.userQueue.push({ role: "tick", content: text });
+  enqueueEvent(event) {
+    this.queue.push(event);
     this.triggerProcess();
   }
 
   triggerProcess() {
-    if (!this.processing) this.process();
+    if (!this.processing) this.processingPromise = this.process();
+    return this.processingPromise;
   }
 
   async process() {
-    if (this.processing) return;
+    if (this.processing) return this.processingPromise;
     this.processing = true;
-    while (this.userQueue.length > 0) {
-      const msg = this.userQueue.shift();
-      if (msg.role === "tick") {
-        this.historyManager.pushHistory({
-          role: "system",
-          content: msg.content
-        });
 
-        await this.metaAbilityManager.tickAll({
-          agent: this,
-          message: msg.content
-        });
+    while (this.queue.length > 0) {
+      const event = this.queue.shift();
+
+      if (event.type === "tick") {
+        this.historyManager.pushHistory({ role: "system", content: event.time });
+        await this.metaAbilityManager.tickAll({ agent: this, message: event.time });
         continue;
       }
-      await handleMessageGeneric(this, msg);
+
+      if (event.type === "message") {
+        await handleMessageGeneric(this, event.content);
+      }
     }
+
     this.processing = false;
   }
 }
 
-
 // =============================
 // 通用消息处理
 // =============================
-
 export async function handleMessageGeneric(agent, message) {
-  // 写入用户消息
-  agent.historyManager.pushHistory({
-    role: "user",
-    content: message.content
-  });
+  let msgObj;
+  try {
+    msgObj = JSON.parse(message);
+  } catch {
+    msgObj = { role: "user", content: message };
+  }
+
+  // 安全处理 content
+  msgObj.content = msgObj.content != null ? String(msgObj.content) : "";
+  agent.historyManager.pushHistory({ role: msgObj.role || "user", content: msgObj.content });
+
   const MAX_HISTORY = 30;
-  const recentHistory = getRecentLLMHistory(agent, MAX_HISTORY);
-  // 第一次调用 LLM
-  const response = await callLLM([
-    {
-      role: "system",
-      content: agent.systemPrompt
-    },
-    ...recentHistory
+  const context = buildContext(agent, MAX_HISTORY);
+
+  // // ===== 调试打印 =====
+  // console.log("===== Messages sent to LLM =====");
+  // console.log([
+  //   { role: "system", content: agent.systemPrompt },
+  //   ...context
+  // ]);
+  console.log("================================");
+
+  const response = await agent.llm.call("deepseek-chat", [
+    { role: "system", content: agent.systemPrompt },
+    ...context
   ]);
 
-  console.log("response:", response.content)
-  // console.log("LLM response:", response.tool_calls);
-  // console.log(response.content);
+  console.log("[Agent-001]" , response.content || "No response");
 
-  // =============================
-  // 如果模型调用工具
-  // =============================
-
+  // ===== 模型调用工具处理 =====
   if (response.tool_calls?.length > 0) {
-    agent.historyManager.pushHistory({
-      role: "assistant",
-      tool_calls: response.tool_calls
-    });
-    console.log("Tool calls name:", response.tool_calls.name, response.tool_calls.arguments);
-    // 执行所有工具
+    agent.historyManager.pushHistory({ role: "tool", content: String(response.content || ""), tool_calls: response.tool_calls });
+
     for (const call of response.tool_calls) {
       let args = {};
-      try {
-        args = JSON.parse(call.function.arguments);
-      } catch {
-        args = {};
-      }
-      const result =
-        (await runTool(call.function.name, args)) ??
-        "[tool returned nothing]";
-
-      // console.log("Tool result:", result);
-      // 写入 tool 返回
-      agent.historyManager.pushHistory({
-        role: "tool",
-        tool_call_id: call.id,
-        content: result
-      });
+      try { args = JSON.parse(call.function.arguments); } catch {}
+      const result = (await runTool(call.function.name, args)) ?? "[tool returned nothing]";
+      agent.historyManager.pushHistory({ role: "assistant", tool_call_id: call.id, content: result });
     }
-    // 工具执行后再次调用 LLM
-    const recentAfterTool = buildContextWindow(agent, MAX_HISTORY);
-    // console.log("Recent after tool:", recentAfterTool);
-    const second = await callLLM([
-      {
-        role: "system",
-        content: agent.systemPrompt
-      },
-      ...recentAfterTool
-    ]);
 
-    // console.log("Second LLM response:", second);
-    agent.historyManager.pushHistory({
-      role: "assistant",
-      content: String(second.content || "").trim()
-    });
+    // 工具执行后再次调用 LLM
+    const contextAfterTool = buildContext(agent, MAX_HISTORY);
+    const second = await agent.llm.call("deepseek-chat", [
+      { role: "system", content: agent.systemPrompt },
+      ...contextAfterTool
+    ]);
+    console.log(second.content);
+
+    agent.historyManager.pushHistory({ role: "assistant", content: String(second.content || "").trim() });
   } else {
-    // 普通回答
-    agent.historyManager.pushHistory({
-      role: "assistant",
-      content: String(response.content || "").trim()
-    });
+    agent.historyManager.pushHistory({ role: "assistant", content: String(response.content || "").trim() });
   }
 }
 
 // =============================
-// 获取最近 LLM 上下文
+// 历史上下文构建（兼容工具调用）
 // =============================
-
-function getRecentLLMHistory(agent, max = 300) {
-  return agent.historyManager
-    .history
-    .slice(-max)
-    .map(msg => {
-
-      if (msg.role === "system") {
-        return { role: "system", content: msg.content };
-      }
-
-      if (msg.role === "tick") {
-        return { role: "tick", content: msg.content };
-      }
-
-
-      if (msg.role === "user") {
-        return { role: "user", content: msg.content };
-      }
-
-      if (msg.role === "assistant" && msg.tool_calls) {
-        return {
-          role: "assistant",
-          content: String(msg.content || ""),
-          tool_calls: msg.tool_calls
-        };
-      }
-
-      if (msg.role === "assistant") {
-        return {
-          role: "assistant",
-          content: msg.content || ""
-        };
-      }
-
-      if (msg.role === "tool") {
-        return {
-          role: "tool",
-          tool_call_id: msg.tool_call_id,
-          content: String(msg.content || "")
-        };
-      }
-      return null;
-    })
-    .filter(Boolean);
-}
-
-function buildContextWindow(agent, max = 40) {
+function buildContext(agent, max = 40) {
   const history = agent.historyManager.history;
-  const result = [];
+  const context = [];
 
-  for (let i = history.length - 1; i >= 0; i--) {
+  for (let i = history.length - 1; i >= 0 && context.length < max; i--) {
     const msg = history[i];
 
-    // tool 需要完整 transaction
-    if (msg.role === "tool") {
-      const prev = history[i - 1];
-
-      if (prev && prev.role === "assistant" && prev.tool_calls) {
-        result.unshift({
-          role: "tool",
-          tool_call_id: msg.tool_call_id,
-          content: String(msg.content || "")
-        });
-
-        result.unshift({
-          role: "assistant",
-          content: String(prev.content || ""),
-          tool_calls: prev.tool_calls
-        });
-
-        i--; // 跳过 assistant(tool_calls)
-        continue;
-      }
-
-      // 非法 tool 直接丢
-      continue;
+    // 只保留 system/user/assistant 消息，assistant 消息可携带 tool_calls
+    if (["assistant", "user", "system"].includes(msg.role)) {
+      const entry = { role: msg.role, content: msg.content || "" };
+      if (msg.tool_calls) entry.tool_calls = msg.tool_calls;
+      context.unshift(entry);
     }
-
-    if (msg.role === "assistant" && msg.tool_calls) {
-      result.unshift({
-        role: "assistant",
-        content: String(msg.content || ""),
-        tool_calls: msg.tool_calls
-      });
-      continue;
-    }
-
-    if (msg.role === "assistant") {
-      result.unshift({
-        role: "assistant",
-        content: String(msg.content || "")
-      });
-      continue;
-    }
-
-    if (msg.role === "user") {
-      result.unshift({
-        role: "user",
-        content: msg.content
-      });
-      continue;
-    }
-
-    if (msg.role === "tick") {
-      result.unshift({
-        role: "system",
-        content: msg.content
-      });
-      continue;
-    }
-
-    if (msg.role === "system") {
-      result.unshift({
-        role: "system",
-        content: msg.content
-      });
-      continue;
-    }
-
-    if (result.length >= max) break;
   }
 
-  return result;
+  return context;
 }
-
-

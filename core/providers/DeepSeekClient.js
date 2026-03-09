@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import { BaseLLMClient } from "./BaseLLMClient.js"
 import { LLMResponse } from "./types/LLMResponse.js"
+import { tools } from "../agent/tools/toolsSchema.js"
 
 export class DeepSeekClient extends BaseLLMClient {
 
@@ -20,6 +21,7 @@ export class DeepSeekClient extends BaseLLMClient {
     const res = await this.client.chat.completions.create({
       model: this.model,
       messages,
+      tools,
       temperature: options.temperature ?? 0.7,
       max_tokens: options.max_tokens ?? 1024
     })
