@@ -7,7 +7,7 @@ yarn-error.log*
 lerna-debug.log*
 prompts
 test-prompts
-agents_meta.json
+agents_meta.json*
 agents_data
 FileSystem
 
