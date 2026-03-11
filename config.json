@@ -1,6 +1,0 @@
-{
-  "tickInterval": 60000,
-  "memoryFile": "./memory.json",
-  "_systemPromptFile": "./core/agent/prompts/systemPromptBak.md",
-  "systemPromptFile": "./core/agent/prompts/system_prompt.md"
-}

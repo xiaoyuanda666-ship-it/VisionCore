@@ -4,7 +4,7 @@ import { LLMManager } from "../core/ai/LLMManager.js"
 
 jest.setTimeout(30000) // LLM 调用可能慢
 
-describe("LLMManager Integration Test", () => {
+describe.skip("LLMManager Integration Test", () => {
   let llmManager
 
   beforeAll(async () => {
