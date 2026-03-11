@@ -13,9 +13,9 @@ describe("MemoryManager addMemory 测试", () => {
 
   beforeAll(async () => {
     // 清空旧数据库目录
-    if (fs.existsSync(dbPath)) {
-      fs.rmSync(dbPath, { recursive: true, force: true })
-    }
+    // if (fs.existsSync(dbPath)) {
+    //   fs.rmSync(dbPath, { recursive: true, force: true })
+    // }
 
     // 初始化 embedding
     await initEmbed()
@@ -27,7 +27,6 @@ describe("MemoryManager addMemory 测试", () => {
 
   test("添加长期记忆并检索", async () => {
     const text = "这是一个长期记忆测试"
-
     await mm.addMemory(text, "longterm")
     const results = await mm.retrieve("长期记忆", "longterm")
 
