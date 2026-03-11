@@ -1,5 +1,5 @@
 // core/__test__/memoryManager.init.test.js
-import { MemoryManager } from "../agent/memoryManager.js"
+import { MemoryManager } from "../memory/memoryManager.js"
 import { initEmbed } from "../ai/embed.js"
 import { jest } from "@jest/globals"
 

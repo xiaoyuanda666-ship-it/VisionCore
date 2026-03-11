@@ -2,7 +2,7 @@
 import fs from "fs"
 import path from "path"
 import { initEmbed } from "../ai/embed.js"
-import { MemoryManager } from "../agent/memoryManager.js"
+import { MemoryManager } from "../memory/memoryManager.js"
 import { jest } from "@jest/globals"
 
 jest.setTimeout(60000)

@@ -6,8 +6,9 @@ import { execute_code } from "./impl/execute_code.js";
 import { list_dir} from "./impl/list_dir.js";
 import { delete_file } from "./impl/delete_file.js";
 import { http_request } from "./impl/http_request.js";
+import { writeMemory } from "./memory/write_memory.js";
 
-export async function runTool(name, args) {
+export async function runTool(name, args, context) {
 
   switch (name) {
 
@@ -18,6 +19,8 @@ export async function runTool(name, args) {
 
     case "write_file":
       return write_file(args);
+    case "write_memory":
+      return writeMemory(args, context)
       
     case "delete_file":
       return delete_file(args);

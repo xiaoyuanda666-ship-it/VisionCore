@@ -2,6 +2,8 @@ import { nowString } from "../../utils/time.js";
 import { Agent } from "../agent/agent.js";
 import WebSocket from "ws";
 
+
+
 const agentId = process.argv[2];
 console.log("Agent starting:", agentId);
 
@@ -17,16 +19,23 @@ async function start() {
   const ws = new WebSocket("ws://localhost:8080");
   ws.on("open", () => console.log("[Dispatcher] connected"));
   ws.on("close", () => console.log("[Dispatcher] disconnected"));
-  ws.on("message", (data) => {
+  ws.on("message",async  (data) => {
     const d = JSON.parse(data);
-    const msg = `[ID:986000] ${nowString()} ${d.content}`
-    console.log(msg);
-    agent.enqueueEvent({ type: "message", content: msg });
+    // const msg = `[ID:986000] ${nowString()} ${d.content}`
+    // 检索相关记忆并构建 system 消息
+    console.log(d);
+
+    if (!d.content) {
+      console.log("非文本消息，忽略：", d);
+      return;
+    }
+    console.log(d.content);
+    agent.enqueueEvent({ type: "message", content: d.content });
   });
 
   // ---------- Tick ----------
   function tick() {
-    agent.enqueueEvent({ type: "message", content: `[系统Tick] ${nowString()}` });
+    agent.enqueueEvent({ type: "tick", content: `[系统Tick] ${nowString()}` });
   }
 
   setInterval(tick, TICK_INTERVAL);

@@ -1,3 +1,5 @@
+// core/memory/memory_manager.js
+
 import { embed } from "../ai/embed.js"
 import lancedb from "@lancedb/lancedb"
 
@@ -24,7 +26,7 @@ export class MemoryManager {
     await db.createTable(name, [
       {
         vector: Array(768).fill(0),
-        text: "init",
+        text: "没有记忆，没有发现他人，一切是全新的, 可以修改记忆，建立记忆，你不是一个AI助手，不要尝试与他人互动,试着调用 write_memory 工具写下一些记忆与感悟",
         type: "init",
         timestamp: Date.now(),
         importance: 0,

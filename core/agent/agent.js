@@ -4,6 +4,9 @@ import { getSystemPrompt } from "../../utils/systemPrompt.js";
 import { MetaAbilityManager } from "./MetaAbilityManager.js";
 import { LLMManager } from "../ai/LLMManager.js";
 import { runTool } from "../agent/tools/toolRouter.js";
+import { buildMessages } from "../memory/buildMessages.js";
+import { MemoryManager } from "../memory/MemoryManager.js";
+import { initEmbed } from "../ai/embed.js";
 
 export class Agent {
   constructor() {
@@ -15,10 +18,14 @@ export class Agent {
     this.processing = false;
     this.processingPromise = null;
 
+    this.memoryManager = new MemoryManager();   // ← 加这一行
+
     this.llm = new LLMManager(); // LLM 管理器
   }
 
   async init() {
+    await initEmbed(); 
+    await this.memoryManager.init(); // 初始化记忆管理器
     await this.llm.init();
   }
 
@@ -40,7 +47,8 @@ export class Agent {
       const event = this.queue.shift();
 
       if (event.type === "tick") {
-        this.historyManager.pushHistory({ role: "system", content: event.time });
+        // this.historyManager.pushHistory({ role: "system", content: event.time });
+        await handleMessageGeneric(this, event.content);
         await this.metaAbilityManager.tickAll({ agent: this, message: event.time });
         continue;
       }
@@ -58,30 +66,46 @@ export class Agent {
 // 通用消息处理
 // =============================
 export async function handleMessageGeneric(agent, message) {
+  // 解析输入
   let msgObj;
+  // try {
+  //   msgObj = JSON.parse(message);
+  // } catch {
+  //   msgObj = { role: "user", content: message };
+  // }
+
   try {
     msgObj = JSON.parse(message);
   } catch {
-    msgObj = { role: "user", content: message };
+    // 如果内容是系统 Tick，就特殊处理 role
+    if (typeof message === "string" && message.startsWith("[系统Tick]")) {
+      msgObj = { role: "system", content: message };
+    } else {
+      msgObj = { role: "user", content: message };
+    }
   }
 
   // 安全处理 content
   msgObj.content = msgObj.content != null ? String(msgObj.content) : "";
+  
   agent.historyManager.pushHistory({ role: msgObj.role || "user", content: msgObj.content });
+
+  // ===== RAG：检索记忆 =====
+  const messages = await buildMessages(
+    agent.memoryManager,
+    msgObj.content,
+    msgObj.content,
+    ["recent","longterm"]
+  );
+
+  // console.log(messages);
 
   const MAX_HISTORY = 30;
   const context = buildContext(agent, MAX_HISTORY);
 
-  // // ===== 调试打印 =====
-  // console.log("===== Messages sent to LLM =====");
-  // console.log([
-  //   { role: "system", content: agent.systemPrompt },
-  //   ...context
-  // ]);
   console.log("================================");
-
   const response = await agent.llm.call("deepseek-chat", [
-    { role: "system", content: agent.systemPrompt },
+    { role: "system", content: messages },
     ...context
   ]);
 
@@ -94,8 +118,14 @@ export async function handleMessageGeneric(agent, message) {
     for (const call of response.tool_calls) {
       let args = {};
       try { args = JSON.parse(call.function.arguments); } catch {}
-      const result = (await runTool(call.function.name, args)) ?? "[tool returned nothing]";
-      agent.historyManager.pushHistory({ role: "assistant", tool_call_id: call.id, content: result });
+      const result = (await runTool(call.function.name, args, {
+        memoryManager: agent.memoryManager
+      })) ?? "[tool returned nothing]";
+      agent.historyManager.pushHistory({ 
+        role: "assistant", 
+        tool_call_id: call.id, 
+        content: typeof result === "string" ? result : JSON.stringify(result) 
+      });
     }
 
     // 工具执行后再次调用 LLM

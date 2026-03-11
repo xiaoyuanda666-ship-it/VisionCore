@@ -1,5 +1,5 @@
 // __tests__/memoryManager.retrieve.test.js
-import { MemoryManager } from "../agent/memoryManager.js"
+import { MemoryManager } from "../memory/memoryManager.js"
 import { jest } from "@jest/globals"
 import { initEmbed } from "../ai/embed.js"
 import fs from "fs"

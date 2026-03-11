@@ -13,6 +13,45 @@ export const tools = [
     }
   }
 },
+{
+  type: "function",
+  function: {
+    name: "write_memory",
+    description: "store important knowledge, experience, or user preference into memory",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The actual content of the memory to store. Can be knowledge, experience, observations, user preferences, or task-related information. Should be concise and meaningful, as it will be embedded and used for retrieval, context reference, and reasoning by the Agent."
+        },
+        type: {
+          type: "string",
+          description: "Memory category, determines storage method and usage:\n" +
+          "- longterm: Long-term memory, stores core knowledge, summarized experience, and user long-term preferences; usually derived from short-term memory\n" +
+          "- shortterm: Short-term memory, temporarily stores information related to the current task or conversation; usually associated with a taskId; can be summarized into longterm memory after completion\n" +
+          "- self: Self memory, stores identity information, relationships, rules, and other core content; persistent and not cleared with other memories\n" +
+          "- recent: Recent memory, stores recently occurred events or context; ordered by time; automatically removed when expired or exceeding the limit",
+          enum: ["longterm", "shortterm", "self", "recent"]
+        },
+        importance: {
+          type: "number",
+          description: 
+          "Memory importance score, range 0–1. Interpreted differently depending on memory type:\n" +
+          "- recent: Importance affects retention within the short time window (e.g., one week); higher importance may delay automatic deletion.\n" +
+          "- shortterm: Importance guides which items may be promoted to recent or longterm memory after task completion.\n" +
+          "- longterm: Importance is advisory; these memories are permanent unless explicitly removed by the agent.\n" +
+          "- self: Importance indicates core identity, relationships, or key knowledge; used for prioritization, sorting, and dynamic loading."
+        },
+        taskId: {
+          type: "string",
+          description: "Optional identifier for a specific task or ongoing activity. Primarily used with shortterm memory to link memories to a particular task, enabling better context tracking, task completion, and selective promotion of important information to recent or longterm memory."
+        }
+      },
+      required: ["text"]
+    }
+  }
+},
 // {
 //   type: "function",
 //   function :{
