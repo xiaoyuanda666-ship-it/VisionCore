@@ -1,5 +1,6 @@
 import WebSocket from "ws"
 import readline from "readline"
+import { nowString } from "../utils/time.js";
 
 const ws = new WebSocket("ws://localhost:8080")
 
@@ -37,7 +38,7 @@ rl.on("line", (line) => {
 
   const message = {
     from: myId,
-    content: line.trim()
+    content: `[ID:Yuanda] ${nowString()} [WebSocket] 消息内容：${line.trim()}`
   }
 
   ws.send(JSON.stringify(message))

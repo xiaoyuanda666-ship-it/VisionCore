@@ -16,8 +16,10 @@ export class HistoryManager {
 
   _getNewHistoryPath() {
     const now = new Date();
-    const timestamp = now.toISOString().replace(/:/g, "-");
-    return path.join(this.historyDir, `History-${timestamp}.json`);
+    // const timestamp = now.toISOString().replace(/:/g, "-");
+    // 方法 1：ISO 格式，只取日期
+    const dateStr1 = now.toISOString().split("T")[0];  // "2026-03-13"
+    return path.join(this.historyDir, `History-${dateStr1}.json`);
     return path.join(this.historyDir, `History-01.json`);
   }
 

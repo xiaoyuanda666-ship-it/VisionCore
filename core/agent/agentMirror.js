@@ -3,37 +3,34 @@ import { HistoryManager } from "../../utils/HistoryManager.js";
 import { getSystemPrompt } from "../../utils/systemPrompt.js";
 import { MetaAbilityManager } from "./MetaAbilityManager.js";
 import { LLMManager } from "../ai/LLMManager.js";
-import { runTool } from "../agent/tools/toolRouter.js";
+import { runTool } from "./tools/toolRouter.js";
 import { buildMessages } from "../memory/buildMessages.js";
-import { MemoryManager } from "../memory/semanticMemory.js";
+import { MemoryManager } from "../memory/MemoryManager.js";
 import { initEmbed } from "../ai/embed.js";
-import WebSocket from "ws"; // 如果想要Agent持有一个websocket连接，可以这样引入WebSocket模块
+import WebSocket from "ws";
 import { OutputQueue } from "./outputQueue.js"
-import { AgentState } from "../memory/agentState.js"
+// import { nowString } from "../../utils/time.js"
 
 export class Agent {
-  constructor(name) {
+  constructor() {
     this.historyManager = new HistoryManager({ historyDir: "./conversation" });
     this.systemPrompt = getSystemPrompt() || "Default system prompt";
     this.metaAbilityManager = new MetaAbilityManager();
     this.wsID = null;
-    this.name = name;
-    this.queue = []; // 统一事件队列
+    this.queue = [];
     this.processing = false;
     this.processingPromise = null;
 
-    this.semanticMemory = new MemoryManager();   // ← 加这一行
+    this.memoryManager = new MemoryManager();
 
-    this.llm = new LLMManager(); // LLM 管理器
-    this.ws = new WebSocket("ws://localhost:8080"); // 初始化WebSocket连接
-    this.agentState = new AgentState(); // 初始化Agent状态管理器
+    this.llm = new LLMManager();
+    this.ws = new WebSocket("ws://localhost:8080");
   }
 
   async init() {
     await initEmbed(); 
-    this.agentState.init(); // 初始化Agent状态管理器
-    await this.semanticMemory.init(); // 初始化记忆管理器
-    await this.llm.init(); // 初始化LLM管理器
+    await this.memoryManager.init();
+    await this.llm.init();
     this.ws.on("open", () => {
       console.log("Connected to dispatcher")
     })
@@ -52,27 +49,14 @@ export class Agent {
         return;
       }
         this.enqueueEvent({ type: "message", content: d.content });
-    });
-      if(!this.agentState.getIdentity("name")){
-        this.agentState.setIdentity("name", this.name); // 设置Agent身份信息
-        this.agentState.setIdentity("self", "who am I? 我需要先调用 modify_self工具修改自我认知"); // 设置Agent身份信息
-        this.agentState.set("nowMemory", "刚刚完成初始化，正在建立记忆")
-        this.agentState.set("recentConversationSummary", "暂时没有任何对话总结")
-        this.agentState.set("subconscious", "暂时没有任何潜意识")
-        this.agentState.set("talkingTo", "暂时没有任何对话对象")
-      }
+      });
     }
+
   enqueueEvent(event) {
     if (event.type === "message") {
-    // 用户消息最高优先级
-    this.queue = []
     this.queue.unshift(event)
     } else {
-      if(!this.processing) {
-        this.queue.push(event)
-      }else {
-        return
-      }
+      this.queue.push(event)
     }
     this.triggerProcess();
   }
@@ -107,25 +91,23 @@ export class Agent {
 
 const output = new OutputQueue()
 
-async function getSubconscious(agent, message){
-  const messages = `你是关联词生成器，生成的关联词要和用户输入紧密相关，用空格隔开，严格遵循输出格式,不管用户说什么，你都要生成最关联的一个到十个关键词 如果是系统 Tick，就原封不动返回，响应示例：(xx xx xx xx xx xx xx xx xx xx)
-  注意事项，不要问问题，不要返回多余的解释，不要返回多余的文字，只输出关联关键词`
-  const response = await agent.llm.call("deepseek-chat", [
-    { role: "system", content: messages },
-    { role: "user", content: message }
-  ]);
-
-  return response.content;
-}
-
 // =============================
 // 通用消息处理
 // =============================
 export async function handleMessageGeneric(agent, message) {
+  output.push(message.content, 2000)
+  // 解析输入
   let msgObj;
+  // try {
+  //   msgObj = JSON.parse(message);
+  // } catch {
+  //   msgObj = { role: "user", content: message };
+  // }
+
   try {
     msgObj = JSON.parse(message);
   } catch {
+    // 如果内容是系统 Tick，就特殊处理 role
     if (typeof message === "string" && message.startsWith("[系统Tick]")) {
       msgObj = { role: "assistant", content: message };
     } else {
@@ -133,28 +115,20 @@ export async function handleMessageGeneric(agent, message) {
     }
   }
 
-  // 如果是系统 Tick，直接更新潜意识，但不存历史
-  const isTick = typeof msgObj.content === "string" && msgObj.content.startsWith("[系统Tick]");
+  // 安全处理 content
+  msgObj.content = msgObj.content != null ? String(msgObj.content) : "";
+  
+  agent.historyManager.pushHistory({ role: msgObj.role || "user", content: msgObj.content });
 
-  const subconscious = await getSubconscious(agent, msgObj.content);
-  agent.agentState.set("subconscious", subconscious);
-
-  // 只存非 Tick 消息
-  if (!isTick) {
-    msgObj.content = msgObj.content != null ? String(msgObj.content) : "";
-    agent.historyManager.pushHistory({ role: msgObj.role || "user", content: msgObj.content });
-  }
   // ===== RAG：检索记忆 =====
   const messages = await buildMessages(
-    agent.semanticMemory,
-    agent.agentState,
-    agent.agentState,
+    agent.memoryManager,
     msgObj.content,
     msgObj.content,
     ["recent","longterm"]
   );
 
-  const MAX_HISTORY = 50;
+  const MAX_HISTORY = 10;
   const context = buildContext(agent, MAX_HISTORY);
   const response = await agent.llm.call("deepseek-chat", [
     { role: "system", content: messages },
@@ -163,6 +137,7 @@ export async function handleMessageGeneric(agent, message) {
 
   console.log("[Agent-001]:");
   output.push(response.content, 2000)
+  agent.enqueueEvent(response.content)
   // const messageToWebSocket = {
   //   from: agent.WebSocketID,
   //   content: response
@@ -172,14 +147,14 @@ export async function handleMessageGeneric(agent, message) {
 
   // ===== 模型调用工具处理 =====
   if (response.tool_calls?.length > 0) {
+    // return
     agent.historyManager.pushHistory({ role: "tool", content: String(response.content || ""), tool_calls: response.tool_calls });
 
     for (const call of response.tool_calls) {
       let args = {};
       try { args = JSON.parse(call.function.arguments); } catch {}
       const result = (await runTool(call.function.name, args, {
-        semanticMemory: agent.semanticMemory,
-        agentState: agent.agentState,
+        memoryManager: agent.memoryManager,
         ws: agent.ws,
         wsID: agent.wsID
       })) ?? "[tool returned nothing]";
@@ -197,8 +172,8 @@ export async function handleMessageGeneric(agent, message) {
       { role: "system", content: agent.systemPrompt },
       ...contextAfterTool
     ]);
-    output.push(second.content, 2000)
-
+    // output.push(second.content, 2000)
+    
     agent.historyManager.pushHistory({ role: "assistant", content: String(second.content || "").trim() });
   } else {
     agent.historyManager.pushHistory({ role: "assistant", content: String(response.content || "").trim() });
@@ -208,7 +183,7 @@ export async function handleMessageGeneric(agent, message) {
 // =============================
 // 历史上下文构建（兼容工具调用）
 // =============================
-function buildContext(agent, max = 20) {
+function buildContext(agent, max =30) {
   const history = agent.historyManager.history;
   const context = [];
 
@@ -224,4 +199,21 @@ function buildContext(agent, max = 20) {
   }
 
   return context;
+}
+
+let printing = false;
+
+async function animateText(text, totalTime = 5000) {
+  if (printing) return;
+  printing = true;
+
+  const lines = text.split("\n");
+  const interval = totalTime / lines.length;
+
+  for (const line of lines) {
+    process.stdout.write(line + "\n");
+    await new Promise(r => setTimeout(r, interval));
+  }
+
+  printing = false;
 }

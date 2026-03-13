@@ -6,7 +6,11 @@ import { execute_code } from "./impl/execute_code.js";
 import { list_dir} from "./impl/list_dir.js";
 import { delete_file } from "./impl/delete_file.js";
 import { http_request } from "./impl/http_request.js";
-import { writeMemory } from "./memory/write_memory.js";
+// import { writeMemory } from "./memory/write_memory.js";
+import { send_message } from "./impl/send_message.js";
+import { modify_nowMemory } from "./memory/modify_nowMemory.js";
+import { modify_self } from "./memory/modify_self.js";
+import { modify_talking_to } from "./memory/modify_talking_to.js";
 
 export async function runTool(name, args, context) {
 
@@ -19,8 +23,19 @@ export async function runTool(name, args, context) {
 
     case "write_file":
       return write_file(args);
-    case "write_memory":
-      return writeMemory(args, context)
+    // case "write_memory":
+    //   return writeMemory(args, context)
+    case "modify_nowMemory":
+      return modify_nowMemory(args, context)
+
+    case "modify_talking_to":
+      return modify_talking_to(args, context)
+
+    case "modify_self":
+    return modify_self(args, context)
+
+    case "send_message_to_websocket":
+      return await send_message(args, context)
       
     case "delete_file":
       return delete_file(args);

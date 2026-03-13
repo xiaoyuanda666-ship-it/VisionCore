@@ -1,6 +1,6 @@
 // core/agent/tools/memory/write_memory.js
 
-export async function writeMemory(args, { memoryManager }) {
+export async function writeMemory(args, { semanticMemory }) {
   try {
     const {
       text,
@@ -34,7 +34,7 @@ export async function writeMemory(args, { memoryManager }) {
     if (safeImportance > 1) safeImportance = 1
 
     // 写入记忆
-    await memoryManager.addMemory(text.trim(), type, {
+    await semanticMemory.addMemory(text.trim(), type, {
       importance: safeImportance,
       taskId
     })

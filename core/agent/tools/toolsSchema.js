@@ -14,6 +14,24 @@ export const tools = [
   }
 },
 {
+    type: "function",
+    function: {
+      name: "send_message_to_websocket",
+      description: "Send a text message to the websocket server",
+      parameters: {
+        type: "object",
+        properties: {
+          content: {
+            type: "string",
+            description: "Text message to send"
+          }
+        },
+        required: ["content"],
+        additionalProperties: false
+      }
+    }
+  },
+{
   type: "function",
   function: {
     name: "write_memory",
@@ -52,21 +70,51 @@ export const tools = [
     }
   }
 },
-// {
-//   type: "function",
-//   function :{
-//     name: "sendMessageToTUIChannel",
-//     description: "通过 WebSocket 向 TUI 频道发送消息",
-//     parameters: {
-//       type: "object",
-//       properties: {
-//         channelName: { type: "string" },
-//         message: { type: "string" }
-//       },
-//       required: ["channelName", "message"]
-//     }
-//   }
-//   },
+{
+  type: "function",
+  function: {
+    name: "modify_nowMemory",
+    description: "修改当前的瞬时记忆,就像人的短期记忆那样，详细的当下，正在处理的工作，头脑下的念头等",
+
+    parameters: {
+      type: "object",
+      properties: {
+        text: { type: "string" }
+      },
+      required: ["text"]
+    }
+  }
+},
+{
+  type: "function",
+  function: {
+    name: "modift_talking_to",
+    description: "修改我正在交谈的对象，就像人的对话意识那样，我正在和谁说话，我正在和哪个对象交互等，喜好是什么样的，以帮助第一时间识别出我正在和谁交谈的对话对象身份，我该用什么样的语气和风格与他交谈，以帮助第一时间识别出我正在和谁交谈的对话对象身份",
+
+    parameters: {
+      type: "object",
+      properties: {
+        text: { type: "string" }
+      },
+      required: ["text"]
+    }
+  }
+},
+{
+  type: "function",
+  function: {
+    name: "modify_self",
+    description: "修改自我认知，就像人的自我意识那样，我是谁，我的名字是什么，我的性格是什么样的等，以帮助第一时间识别到我自己的身份",
+
+    parameters: {
+      type: "object",
+      properties: {
+        text: { type: "string" }
+      },
+      required: ["text"]
+    }
+  }
+},
 {
   type: "function",
   function: {
